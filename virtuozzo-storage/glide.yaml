@@ -1,0 +1,4 @@
+package: github.com/kubernetes-incubator/external-storage/virtuozzo-storage
+import:
+- package: github.com/kolyshkin/goploop-cli
+  version: 5365b446a713e31ac4f2026b05a6dac27bbdf21c
