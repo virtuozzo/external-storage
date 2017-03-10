@@ -1,7 +1,7 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: vz-claim
+  name: virtuizzo-storage-test-claim
   annotations:
     volume.beta.kubernetes.io/storage-class: "virtuozzo-storage"
 spec:

@@ -1,7 +1,7 @@
 kind: Pod
 apiVersion: v1
 metadata:
-  name: test-pod-ro1
+  name: test-pod
 spec:
   containers:
   - name: test-pod-ro
@@ -10,13 +10,13 @@ spec:
       - "/bin/sh"
     args:
       - "-c"
-      - "while :; do sleep 10; done; while :; do let i=i+1; sleep 1; echo ok $i >> /mnt/date || break; done"
+      - "echo Hello > /mnt/Hi || exit 1; while :; do sleep 10; done;"
     volumeMounts:
       - name: pvc
         mountPath: "/mnt"
-        readOnly: true
+        readOnly: false
   restartPolicy: "Never"
   volumes:
     - name: pvc
       persistentVolumeClaim:
-        claimName: vz-claim
+        claimName: virtuizzo-storage-test-claim
