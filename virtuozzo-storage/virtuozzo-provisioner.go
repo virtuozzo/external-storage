@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"time"
 
 	"github.com/golang/glog"
@@ -71,6 +72,7 @@ var _ controller.Provisioner = &vzFSProvisioner{}
 func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
 	var (
 		capacity resource.Quantity
+		labels   map[string]string
 	)
 	volumePath, err := p.parseParameters(options.Parameters)
 	if err != nil {
@@ -80,8 +82,8 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 	capacity = options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	bytes := capacity.Value()
 
-	if options.PVC.Spec.Selector != nil {
-		return nil, fmt.Errorf("claim Selector is not supported")
+	if options.PVC.Spec.Selector != nil && options.PVC.Spec.Selector.MatchExpressions != nil {
+		return nil, fmt.Errorf("claim Selector.matchExpressions is not supported")
 	}
 	share := fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
 
@@ -90,13 +92,37 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 	// ploop driver takes kilobytes, so convert it
 	volume_size := bytes / 1024
 
+	if options.PVC.Spec.Selector != nil && options.PVC.Spec.Selector.MatchLabels != nil {
+		labels = options.PVC.Spec.Selector.MatchLabels
+	}
+
+	ploop_path := volumePath + "/" + share
 	// make the base directory where the volume will go
-	err = os.MkdirAll(volumePath+"/"+share, 0700)
+	err = os.MkdirAll(ploop_path, 0700)
 	if err != nil {
 		return nil, err
 	}
+
+	if labels != nil {
+		var err error
+		for k, v := range labels {
+			switch k {
+			case "vzsReplicas":
+				cmd := "vstorage"
+				args := []string{"set-attr", "-R", ploop_path, fmt.Sprintf("replicas=%s", v)}
+				err = exec.Command(cmd, args...).Run()
+			default:
+				glog.Infof("Skip %s = %s", k, v)
+			}
+			if err != nil {
+				os.RemoveAll(ploop_path)
+				return nil, err
+			}
+		}
+	}
+
 	// Create the ploop volume
-	cp := ploop.CreateParam{Size: uint64(volume_size), File: volumePath + "/" + share + "/" + share} // use correct path
+	cp := ploop.CreateParam{Size: uint64(volume_size), File: ploop_path + "/" + share} // use correct path
 	// if there's an issue, return a failure
 	if err := ploop.Create(&cp); err != nil {
 		return nil, err
@@ -109,6 +135,7 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 				provisionerIDAnn: string(p.identity),
 				vzShareAnn:       share,
 			},
+			Labels: labels,
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
@@ -171,10 +198,10 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	}
 
 	options := volume.Spec.PersistentVolumeSource.FlexVolume.Options
-	path := options["volumePath"] +"/"+options["volumeId"]
+	path := options["volumePath"] + "/" + options["volumeId"]
 	glog.Infof("Delete: %s", path)
 	err := os.RemoveAll(path)
-	if (err != nil) {
+	if err != nil {
 		return err
 	}
 
