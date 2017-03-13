@@ -1,0 +1,17 @@
+[virtuozzo-os]
+name=Virtuozzo
+mirrorlist=http://repo.virtuozzo.com/vz/mirrorlists/7.0/releases-os.mirrorlist
+#baseurl=http://repo.virtuozzo.com/vz/releases/7.0/x86_64/os/
+enabled=1
+gpgcheck=1
+priority=50
+gpgkey=http://repo.virtuozzo.com/vzlinux/security/VIRTUOZZO_GPG_KEY
+
+[virtuozzo-updates]
+name=Virtuozzo Updates
+mirrorlist=http://repo.virtuozzo.com/vz/mirrorlists/7.0/updates-os.mirrorlist
+#baseurl=http://repo.virtuozzo.com/vz/updates/7.0/x86_64/os/
+enabled=1
+gpgcheck=1
+priority=50
+gpgkey=http://repo.virtuozzo.com/vzlinux/security/VIRTUOZZO_GPG_KEY
