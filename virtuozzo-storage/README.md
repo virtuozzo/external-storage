@@ -4,24 +4,25 @@ Using Virtuozzo Storage and Ploop devices
 
 # Test instruction
 
-* Build virtuozzo-provisioner
+* Build the ploop-flexvol driver and copy binary file to virtuozzo-storage provisioner directory
+
+https://github.com/avagin/ploop-flexvol
+
+* Build virtuozzo-provisioner and container image
 
 ```bash
 make
+docker build -t virtuozzo-storage .
 ```
-
-* Build and install the ploop-flexvol driver
-
-https://github.com/avagin/ploop-flexvol
 
 * Start Kubernetes local cluster
 
 * Start Virtuozzo provisioner
 
-Assume kubeconfig is at `/root/.kube`:
+Assume kubeconfig is at `/root/.kube` and vstorage mounted on all cluster nodes in /mnt/vstorage:
 
 ```bash
-./virtuozzo-storage -master=http://127.0.0.1:8080
+docker run -tid -v /mnt/vstorage/kube/:/mnt/vstorage/kube/ -v /root/.kube:/kube --privileged --net=host  virtuozzo-storage /usr/local/bin/virtuozzo-storage -master=http://127.0.0.1:8080 -kubeconfig=/kube/config
 ```
 
 * Create a Virtuozzo Storage Class
@@ -44,3 +45,4 @@ kubectl create -f test-pod.yaml
 
 
 # Known limitations
+Vstorage must be mounted manually on all cluster nodes
