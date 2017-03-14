@@ -23,6 +23,8 @@ func Create(options map[string]string) error {
 		case "size":
 			size = v
 		case "vzsReplicas":
+		case "vzsFailureDomain":
+		case "vzsEncoding":
 		case "vzsTier":
 		case "kubernetes.io/readwrite":
 		case "kubernetes.io/fsType":
@@ -59,21 +61,27 @@ func Create(options map[string]string) error {
 
 	for k, v := range options {
 		var err error
-
+		attr := ""
 		switch k {
 		case "vzsReplicas":
-			cmd := "vstorage"
-			args := []string{"set-attr", "-R", ploop_path, fmt.Sprintf("replicas=%s", v)}
-			err = exec.Command(cmd, args...).Run()
+			attr = "replicas"
 		case "vzsTier":
+			attr = "tier"
+		case "vzsEncoding":
+			attr = "encoding"
+		case "vzsFailureDomain":
+			attr = "failure-domain"
+		}
+		if attr != "" {
 			cmd := "vstorage"
-			args := []string{"set-attr", "-R", ploop_path, fmt.Sprintf("tier=%s", v)}
+			args := []string{"set-attr", "-R", ploop_path,
+						fmt.Sprintf("%s=%s", attr, v)}
 			err = exec.Command(cmd, args...).Run()
 		}
 
 		if err != nil {
 			os.RemoveAll(ploop_path)
-			return err
+			return fmt.Errorf("Unable to set %s to %s: %v", attr, v, err)
 		}
 	}
 

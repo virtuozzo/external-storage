@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -102,8 +103,16 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 		for k, v := range labels {
 			switch k {
 			case "vzsReplicas":
-				fallthrough
+				v = strings.Replace(v, ".", ":", 1)
+				v = strings.Replace(v, ".", "/", 1)
+				ploop_options[k] = v
 			case "vzsTier":
+				fallthrough
+			case "vzsEncoding":
+				v = strings.Replace(v, ".", "+", 1)
+				v = strings.Replace(v, ".", "/", 1)
+				ploop_options[k] = v
+			case "vzsFailureDomain":
 				ploop_options[k] = v
 			default:
 				glog.Infof("Skip %s = %s", k, v)
