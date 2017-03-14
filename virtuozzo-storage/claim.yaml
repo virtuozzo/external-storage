@@ -14,4 +14,4 @@ spec:
   selector:
     matchLabels:
       vzsTier: "0"
-      vzsReplicas: "2"
+      vzsReplicas: "2.1.3"
