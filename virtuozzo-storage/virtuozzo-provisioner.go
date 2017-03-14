@@ -93,11 +93,10 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 	}
 
 	ploop_options := map[string]string{
-						"volumePath": volumePath,
-						"volumeId":   share,
-						"size":       fmt.Sprintf("%d", bytes),
-					}
-
+		"volumePath": volumePath,
+		"volumeId":   share,
+		"size":       fmt.Sprintf("%d", bytes),
+	}
 
 	if labels != nil {
 		for k, v := range labels {
@@ -133,7 +132,7 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				FlexVolume: &v1.FlexVolumeSource{
-					Driver: "jaxxstorm/ploop",
+					Driver:  "jaxxstorm/ploop",
 					Options: ploop_options,
 				},
 			},
