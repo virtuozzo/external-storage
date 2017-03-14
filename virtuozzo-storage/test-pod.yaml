@@ -16,7 +16,9 @@ spec:
         mountPath: "/mnt"
         readOnly: false
   restartPolicy: "Never"
+  nodeSelector:
+    os: parallels # make sure you label your nodes to be ploop compatible 
   volumes:
     - name: pvc
       persistentVolumeClaim:
-        claimName: virtuizzo-storage-test-claim
+        claimName: vz-test-claim
