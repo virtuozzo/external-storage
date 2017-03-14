@@ -21,7 +21,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"time"
 
 	"github.com/golang/glog"
@@ -35,7 +34,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/kolyshkin/goploop-cli"
+	"github.com/avagin/ploop-flexvol/volume"
 )
 
 const (
@@ -89,42 +88,31 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 
 	glog.Infof("Add %s %s %s", volumePath, share, capacity.Value())
 
-	// ploop driver takes kilobytes, so convert it
-	volume_size := bytes / 1024
-
 	if options.PVC.Spec.Selector != nil && options.PVC.Spec.Selector.MatchLabels != nil {
 		labels = options.PVC.Spec.Selector.MatchLabels
 	}
 
-	ploop_path := volumePath + "/" + share
-	// make the base directory where the volume will go
-	err = os.MkdirAll(ploop_path, 0700)
-	if err != nil {
-		return nil, err
-	}
+	ploop_options := map[string]string{
+						"volumePath": volumePath,
+						"volumeId":   share,
+						"size":       fmt.Sprintf("%d", bytes),
+					}
+
 
 	if labels != nil {
-		var err error
 		for k, v := range labels {
 			switch k {
 			case "vzsReplicas":
-				cmd := "vstorage"
-				args := []string{"set-attr", "-R", ploop_path, fmt.Sprintf("replicas=%s", v)}
-				err = exec.Command(cmd, args...).Run()
+				fallthrough
+			case "vzsTier":
+				ploop_options[k] = v
 			default:
 				glog.Infof("Skip %s = %s", k, v)
-			}
-			if err != nil {
-				os.RemoveAll(ploop_path)
-				return nil, err
 			}
 		}
 	}
 
-	// Create the ploop volume
-	cp := ploop.CreateParam{Size: uint64(volume_size), File: ploop_path + "/" + share} // use correct path
-	// if there's an issue, return a failure
-	if err := ploop.Create(&cp); err != nil {
+	if err := volume.Create(ploop_options); err != nil {
 		return nil, err
 	}
 
@@ -146,11 +134,7 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				FlexVolume: &v1.FlexVolumeSource{
 					Driver: "jaxxstorm/ploop",
-					Options: map[string]string{
-						"volumePath": volumePath,
-						"volumeId":   share,
-						"size":       "10G",
-					},
+					Options: ploop_options,
 				},
 			},
 		},
