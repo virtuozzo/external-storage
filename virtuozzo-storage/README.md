@@ -43,6 +43,30 @@ kubectl create -f claim.yaml
 kubectl create -f test-pod.yaml
 ```
 
+# Ploop options
+
+A storage class parameters pass as ploop options to the ploop-flexvol driver.
+
+Another way to pass ploop options is to use labels in claims. In this case all special symbols (e.g. +,/, etc) have to be replaced by dots.
+
+Labels in claims can be used to pass ploop options, but all special symbols has to be replaced by dots.
+ kind: PersistentVolumeClaim
+ apiVersion: v1
+ metadata:
+   name: vz-test-claim
+   annotations:
+     volume.beta.kubernetes.io/storage-class: "virtuozzo-storage"
+ spec:
+   accessModes:
+     - ReadWriteOnce
+     - ReadOnlyMany
+   resources:
+     requests:
+       storage: 1Gi
+   selector:
+     matchLabels:
+       vzsTier: "0"
+       vzsReplicas: "2.1.3"
 
 # Known limitations
 Vstorage must be mounted manually on all cluster nodes
