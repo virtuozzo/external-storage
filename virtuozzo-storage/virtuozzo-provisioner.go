@@ -74,10 +74,6 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 		capacity resource.Quantity
 		labels   map[string]string
 	)
-	volumePath, err := p.parseParameters(options.Parameters)
-	if err != nil {
-		return nil, err
-	}
 
 	capacity = options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	bytes := capacity.Value()
@@ -87,17 +83,16 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 	}
 	share := fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
 
-	glog.Infof("Add %s %s %s", volumePath, share, capacity.Value())
+	glog.Infof("Add %s %s", share, capacity.Value())
 
 	if options.PVC.Spec.Selector != nil && options.PVC.Spec.Selector.MatchLabels != nil {
 		labels = options.PVC.Spec.Selector.MatchLabels
 	}
 
-	ploop_options := map[string]string{
-		"volumePath": volumePath,
-		"volumeId":   share,
-		"size":       fmt.Sprintf("%d", bytes),
-	}
+	ploop_options := options.Parameters
+
+	ploop_options["volumeId"] = share
+	ploop_options["size"] = fmt.Sprintf("%d", bytes)
 
 	if labels != nil {
 		for k, v := range labels {
@@ -151,27 +146,6 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 	glog.Infof("successfully created virtuozzo storage share: %s", share)
 
 	return pv, nil
-}
-
-func (p *vzFSProvisioner) parseParameters(parameters map[string]string) (string, error) {
-	var (
-		volumePath string
-	)
-
-	for k, v := range parameters {
-		switch k {
-		case "volumePath":
-			volumePath = v
-		default:
-			return "", fmt.Errorf("invalid option %q", k)
-		}
-	}
-
-	if volumePath == "" {
-		return "", fmt.Errorf("missing volumePath")
-	}
-
-	return volumePath, nil
 }
 
 // Delete removes the storage asset that was created by Provision represented
