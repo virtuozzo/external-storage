@@ -1,4 +1,7 @@
 FROM centos:7
+ENTRYPOINT ["virtuozzo-storage"]
+CMD -master=http://127.0.0.1:8080 -kubeconfig=/kube/config
+
 RUN mkdir -p /mnt/vstorage/kube/
 ADD virtuozzo.repo /etc/yum.repos.d/
 RUN yum upgrade -y
