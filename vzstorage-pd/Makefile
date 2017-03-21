@@ -1,7 +1,7 @@
 NAME	:= vzstorage-pd
 BINS	:= vzstorage-pd
 BINDIR	:= /usr/bin
-GITID	:= $(shell git describe --always HEAD)
+GITID	?= $(shell git describe --always HEAD || true)
 TARNAME	:= $(NAME)-$(GITID)
 
 all:
