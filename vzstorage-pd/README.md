@@ -22,7 +22,7 @@ docker build -t virtuozzo-storage .
 Assume kubeconfig is at `/root/.kube` and vstorage mounted on all cluster nodes in /mnt/vstorage:
 
 ```bash
-docker run -tid -v /mnt/vstorage/kube/:/mnt/vstorage/kube/ -v /root/.kube:/kube --privileged --net=host  virtuozzo-storage /usr/local/bin/virtuozzo-storage -master=http://127.0.0.1:8080 -kubeconfig=/kube/config
+docker run -tid -v /mnt/vstorage/kube/:/mnt/vstorage/kube/ -v /root/.kube:/kube --privileged --net=host virtuozzo-storage
 ```
 
 * Create a Virtuozzo Storage Class
