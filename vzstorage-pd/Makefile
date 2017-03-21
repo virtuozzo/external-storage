@@ -14,6 +14,11 @@ tar: $(TARNAME).tar.bz2
 dist: tar
 .PHONY: dist
 
+rpm: tar
+	sed -i "s/\(%global commit[[:space:]]*\).*$$/\1 $(GITID)/" $(NAME).spec
+	rpmbuild -ba --define "_sourcedir $$PWD" $(NAME).spec
+.PHONY: rpm
+
 $(TARNAME).tar.bz2:
 	(cd .. && git archive --format tar --prefix "$(TARNAME)/" $(GITID)) \
 		| bzip2 -9 > $@
