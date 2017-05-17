@@ -136,7 +136,7 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				FlexVolume: &v1.FlexVolumeSource{
-					Driver:  "jaxxstorm/ploop",
+					Driver:  "virtuozzo/ploop",
 					Options: ploop_options,
 				},
 			},
