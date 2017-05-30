@@ -89,7 +89,10 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 		labels = options.PVC.Spec.Selector.MatchLabels
 	}
 
-	ploop_options := options.Parameters
+	ploop_options := map[string]string{}
+	for k,v := range options.Parameters {
+		ploop_options[k] = v
+	}
 
 	ploop_options["volumeId"] = share
 	ploop_options["size"] = fmt.Sprintf("%d", bytes)
