@@ -21,7 +21,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -72,22 +71,17 @@ var _ controller.Provisioner = &vzFSProvisioner{}
 func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
 	var (
 		capacity resource.Quantity
-		labels   map[string]string
 	)
 
 	capacity = options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	bytes := capacity.Value()
 
-	if options.PVC.Spec.Selector != nil && options.PVC.Spec.Selector.MatchExpressions != nil {
-		return nil, fmt.Errorf("claim Selector.matchExpressions is not supported")
+	if options.PVC.Spec.Selector != nil {
+		return nil, fmt.Errorf("claim Selector is not supported")
 	}
 	share := fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
 
 	glog.Infof("Add %s %s", share, capacity.Value())
-
-	if options.PVC.Spec.Selector != nil && options.PVC.Spec.Selector.MatchLabels != nil {
-		labels = options.PVC.Spec.Selector.MatchLabels
-	}
 
 	ploop_options := map[string]string{}
 	for k,v := range options.Parameters {
@@ -96,27 +90,6 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 
 	ploop_options["volumeId"] = share
 	ploop_options["size"] = fmt.Sprintf("%d", bytes)
-
-	if labels != nil {
-		for k, v := range labels {
-			switch k {
-			case "vzsReplicas":
-				v = strings.Replace(v, ".", ":", 1)
-				v = strings.Replace(v, ".", "/", 1)
-				ploop_options[k] = v
-			case "vzsTier":
-				fallthrough
-			case "vzsEncoding":
-				v = strings.Replace(v, ".", "+", 1)
-				v = strings.Replace(v, ".", "/", 1)
-				ploop_options[k] = v
-			case "vzsFailureDomain":
-				ploop_options[k] = v
-			default:
-				glog.Infof("Skip %s = %s", k, v)
-			}
-		}
-	}
 
 	if err := volume.Create(ploop_options); err != nil {
 		return nil, err
@@ -129,7 +102,6 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 				provisionerIDAnn: string(p.identity),
 				vzShareAnn:       share,
 			},
-			Labels: labels,
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
