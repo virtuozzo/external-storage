@@ -1,2 +1,4 @@
 package: github.com/kubernetes-incubator/external-storage/virtuozzo-storage
-import: []
+import:
+- package: github.com/virtuozzo/ploop-flexvol
+  version: kube-1.6
