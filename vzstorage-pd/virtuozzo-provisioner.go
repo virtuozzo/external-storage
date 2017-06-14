@@ -21,6 +21,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
+	"syscall"
 	"time"
 
 	"github.com/golang/glog"
@@ -34,7 +36,9 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/avagin/ploop-flexvol/volume"
+	"github.com/dustin/go-humanize"
+	"github.com/kolyshkin/goploop-cli"
+	"github.com/virtuozzo/ploop-flexvol/vstorage"
 )
 
 const (
@@ -67,6 +71,119 @@ func newVzFSProvisioner(client kubernetes.Interface) controller.Provisioner {
 
 var _ controller.Provisioner = &vzFSProvisioner{}
 
+const MountDir = "/var/run/virtuozzo-provisioner/mnt/"
+
+func prepareVstorage(options map[string]string, clusterName string, clusterPassword string) error {
+	mount := MountDir + clusterName
+	mounted, _ := vstorage.IsVstorage(mount)
+	if mounted {
+		return nil
+	}
+
+	if err := os.MkdirAll(mount, 0755); err != nil {
+		return err
+	}
+
+	v := vstorage.Vstorage{clusterName}
+	p, _ := v.Mountpoint()
+	if p != "" {
+		return syscall.Mount(p, mount, "", syscall.MS_BIND, "")
+	}
+
+	if err := v.Auth(clusterPassword); err != nil {
+		return err
+	}
+	if err := v.Mount(mount); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func createPloop(mount string, options map[string]string) error {
+	var (
+		volumePath, volumeId, size string
+	)
+
+	for k, v := range options {
+		switch k {
+		case "volumePath":
+			volumePath = v
+		case "volumeId":
+			volumeId = v
+		case "size":
+			size = v
+		case "vzsReplicas":
+		case "vzsFailureDomain":
+		case "vzsEncoding":
+		case "vzsTier":
+		case "kubernetes.io/readwrite":
+		case "kubernetes.io/fsType":
+		default:
+		}
+	}
+
+	if volumePath == "" {
+		return fmt.Errorf("volumePath isn't specified")
+	}
+
+	if volumeId == "" {
+		return fmt.Errorf("volumeId isn't specified")
+	}
+
+	if size == "" {
+		return fmt.Errorf("size isn't specified")
+	}
+
+	// get a human readable size from the map
+	bytes, _ := humanize.ParseBytes(size)
+
+	// ploop driver takes kilobytes, so convert it
+	volume_size := bytes / 1024
+
+	ploop_path := mount + "/" + options["volumePath"] + "/" + options["volumeId"]
+
+	// make the base directory where the volume will go
+	err := os.MkdirAll(ploop_path, 0700)
+	if err != nil {
+		return err
+	}
+
+	for k, v := range options {
+		var err error
+		attr := ""
+		switch k {
+		case "vzsReplicas":
+			attr = "replicas"
+		case "vzsTier":
+			attr = "tier"
+		case "vzsEncoding":
+			attr = "encoding"
+		case "vzsFailureDomain":
+			attr = "failure-domain"
+		}
+		if attr != "" {
+			cmd := "vstorage"
+			args := []string{"set-attr", "-R", ploop_path,
+				fmt.Sprintf("%s=%s", attr, v)}
+			err = exec.Command(cmd, args...).Run()
+		}
+
+		if err != nil {
+			os.RemoveAll(ploop_path)
+			return fmt.Errorf("Unable to set %s to %s: %v", attr, v, err)
+		}
+	}
+
+	// Create the ploop volume
+	cp := ploop.CreateParam{Size: volume_size, File: ploop_path + "/" + options["volumeId"]}
+	if err := ploop.Create(&cp); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
 	var (
@@ -81,17 +198,29 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 	}
 	share := fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
 
-	glog.Infof("Add %s %s", share, capacity.Value())
+	glog.Infof("Add %s %s", share, bytes)
 
-	ploop_options := map[string]string{}
-	for k,v := range options.Parameters {
-		ploop_options[k] = v
+	storage_class_options := map[string]string{}
+	for k, v := range options.Parameters {
+		storage_class_options[k] = v
 	}
 
-	ploop_options["volumeId"] = share
-	ploop_options["size"] = fmt.Sprintf("%d", bytes)
+	storage_class_options["volumeId"] = share
+	storage_class_options["size"] = fmt.Sprintf("%d", bytes)
 
-	if err := volume.Create(ploop_options); err != nil {
+	secret, err := p.client.Core().Secrets(storage_class_options["secretNamespace"]).Get(storage_class_options["secretName"])
+	if err != nil {
+		return nil, err
+	}
+
+	name := string(secret.Data["clusterName"][:len(secret.Data["clusterName"])])
+	password := string(secret.Data["clusterPassword"][:len(secret.Data["clusterPassword"])])
+	if err := prepareVstorage(storage_class_options, name, password); err != nil {
+		return nil, err
+	}
+	defer syscall.Unmount(MountDir + name, syscall.MNT_DETACH)
+
+	if err := createPloop(MountDir + name, storage_class_options); err != nil {
 		return nil, err
 	}
 
@@ -111,8 +240,9 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				FlexVolume: &v1.FlexVolumeSource{
-					Driver:  "virtuozzo/ploop",
-					Options: ploop_options,
+					Driver:    "virtuozzo/ploop",
+					SecretRef: &v1.LocalObjectReference{Name: storage_class_options["SecretRef"]},
+					Options:   storage_class_options,
 				},
 			},
 		},
@@ -139,7 +269,16 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	}
 
 	options := volume.Spec.PersistentVolumeSource.FlexVolume.Options
-	path := options["volumePath"] + "/" + options["volumeId"]
+
+	mount := MountDir + options["kubernetes.io/secret/clusterName"]
+	if err := prepareVstorage(options,
+		options["kubernetes.io/secret/clusterName"],
+		options["kubernetes.io/secret/clusterPassword"]); err != nil {
+		return err
+	}
+	defer syscall.Unmount(mount, syscall.MNT_DETACH)
+
+	path := mount + "/" + options["volumePath"] + "/" + options["volumeId"]
 	glog.Infof("Delete: %s", path)
 	err := os.RemoveAll(path)
 	if err != nil {
