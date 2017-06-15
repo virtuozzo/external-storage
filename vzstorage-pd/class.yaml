@@ -4,5 +4,5 @@ metadata:
   name: virtuozzo-storage
 provisioner: kubernetes.io/virtuozzo-storage
 parameters:
-  volumePath: "/mnt/vstorage/kube/"
-  secretRef: "virtuozzo-secret"
+  volumePath: "k8s-volumes"
+  secretName: "virtuozzo-secret"
