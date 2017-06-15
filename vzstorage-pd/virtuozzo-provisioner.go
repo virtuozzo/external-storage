@@ -270,19 +270,25 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return errors.New("vz share annotation not found on PV")
 	}
 
+	secretName := volume.Spec.PersistentVolumeSource.FlexVolume.SecretRef.Name
 	options := volume.Spec.PersistentVolumeSource.FlexVolume.Options
 
-	mount := MountDir + options["kubernetes.io/secret/clusterName"]
-	if err := prepareVstorage(options,
-		options["kubernetes.io/secret/clusterName"],
-		options["kubernetes.io/secret/clusterPassword"]); err != nil {
+	secret, err := p.client.Core().Secrets(volume.Spec.ClaimRef.Namespace).Get(secretName)
+	if err != nil {
+		return err
+	}
+
+	name := string(secret.Data["clusterName"][:len(secret.Data["clusterName"])])
+	password := string(secret.Data["clusterPassword"][:len(secret.Data["clusterPassword"])])
+	mount := MountDir + name
+	if err := prepareVstorage(options, name, password); err != nil {
 		return err
 	}
 	defer syscall.Unmount(mount, syscall.MNT_DETACH)
 
 	path := mount + "/" + options["volumePath"] + "/" + options["volumeId"]
 	glog.Infof("Delete: %s", path)
-	err := os.RemoveAll(path)
+	err = os.RemoveAll(path)
 	if err != nil {
 		return err
 	}
