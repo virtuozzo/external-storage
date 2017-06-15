@@ -207,8 +207,10 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 
 	storage_class_options["volumeId"] = share
 	storage_class_options["size"] = fmt.Sprintf("%d", bytes)
+	secretName := storage_class_options["secretName"]
+	delete(storage_class_options, "secretName")
 
-	secret, err := p.client.Core().Secrets(storage_class_options["secretNamespace"]).Get(storage_class_options["secretName"])
+	secret, err := p.client.Core().Secrets(options.PVC.Namespace).Get(secretName)
 	if err != nil {
 		return nil, err
 	}
@@ -218,9 +220,9 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 	if err := prepareVstorage(storage_class_options, name, password); err != nil {
 		return nil, err
 	}
-	defer syscall.Unmount(MountDir + name, syscall.MNT_DETACH)
+	defer syscall.Unmount(MountDir+name, syscall.MNT_DETACH)
 
-	if err := createPloop(MountDir + name, storage_class_options); err != nil {
+	if err := createPloop(MountDir+name, storage_class_options); err != nil {
 		return nil, err
 	}
 
@@ -241,7 +243,7 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				FlexVolume: &v1.FlexVolumeSource{
 					Driver:    "virtuozzo/ploop",
-					SecretRef: &v1.LocalObjectReference{Name: storage_class_options["SecretRef"]},
+					SecretRef: &v1.LocalObjectReference{Name: secretName},
 					Options:   storage_class_options,
 				},
 			},
