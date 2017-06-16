@@ -27,11 +27,11 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/util/uuid"
-	"k8s.io/client-go/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -60,7 +60,7 @@ type vzFSProvisioner struct {
 
 func newVzFSProvisioner(client kubernetes.Interface) controller.Provisioner {
 	return &vzFSProvisioner{
-		client:   client,
+		client: client,
 	}
 }
 
@@ -182,11 +182,7 @@ func createPloop(mount string, options map[string]string) error {
 
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
-	var (
-		capacity resource.Quantity
-	)
-
-	capacity = options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	capacity := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	bytes := capacity.Value()
 
 	if options.PVC.Spec.Selector != nil {
@@ -206,7 +202,7 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 	secretName := storage_class_options["secretName"]
 	delete(storage_class_options, "secretName")
 
-	secret, err := p.client.Core().Secrets(options.PVC.Namespace).Get(secretName)
+	secret, err := p.client.Core().Secrets(options.PVC.Namespace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +219,7 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 	}
 
 	pv := &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
 			Annotations: map[string]string{
 				parentProvisionerAnn: *provisionerId,
@@ -269,7 +265,7 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	secretName := volume.Spec.PersistentVolumeSource.FlexVolume.SecretRef.Name
 	options := volume.Spec.PersistentVolumeSource.FlexVolume.Options
 
-	secret, err := p.client.Core().Secrets(volume.Spec.ClaimRef.Namespace).Get(secretName)
+	secret, err := p.client.Core().Secrets(volume.Spec.ClaimRef.Namespace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -295,8 +291,8 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 }
 
 var (
-	master     = flag.String("master", "", "Master URL")
-	kubeconfig = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
+	master        = flag.String("master", "", "Master URL")
+	kubeconfig    = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
 	provisionerId = flag.String("name", "", "Unique provisioner name")
 )
 
@@ -335,7 +331,11 @@ func main() {
 	vzFSProvisioner := newVzFSProvisioner(clientset)
 
 	// Start the provision controller which will dynamically provision Virtuozzo Storage PVs
-	pc := controller.NewProvisionController(clientset, resyncPeriod, provisionerName, vzFSProvisioner, serverVersion.GitVersion, exponentialBackOffOnError, failedRetryThreshold, 2*resyncPeriod, resyncPeriod, resyncPeriod/2, 2*resyncPeriod)
+	pc := controller.NewProvisionController(clientset,
+		provisionerName,
+		vzFSProvisioner,
+		serverVersion.GitVersion,
+	)
 
 	pc.Run(wait.NeverStop)
 }
