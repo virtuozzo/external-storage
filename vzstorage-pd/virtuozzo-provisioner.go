@@ -30,7 +30,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/types"
 	"k8s.io/client-go/pkg/util/uuid"
 	"k8s.io/client-go/pkg/util/wait"
 	"k8s.io/client-go/rest"
@@ -46,7 +45,7 @@ const (
 	provisionerName           = "kubernetes.io/virtuozzo-storage"
 	exponentialBackOffOnError = false
 	failedRetryThreshold      = 5
-	provisionerIDAnn          = "vzFSProvisionerIdentity"
+	parentProvisionerAnn      = "vzFSParentProvisioner"
 	vzShareAnn                = "vzShare"
 )
 
@@ -57,21 +56,18 @@ type provisionOutput struct {
 type vzFSProvisioner struct {
 	// Kubernetes Client. Use to retrieve Ceph admin secret
 	client kubernetes.Interface
-	// Identity of this vzFSProvisioner, generated. Used to identify "this"
-	// provisioner's PVs.
-	identity types.UID
 }
 
 func newVzFSProvisioner(client kubernetes.Interface) controller.Provisioner {
 	return &vzFSProvisioner{
 		client:   client,
-		identity: uuid.NewUUID(),
 	}
 }
 
 var _ controller.Provisioner = &vzFSProvisioner{}
 
-const MountDir = "/var/run/virtuozzo-provisioner/mnt/"
+const ProvisionerDir = "/var/run/virtuozzo-provisioner/"
+const MountDir = ProvisionerDir + "mnt/"
 
 func prepareVstorage(options map[string]string, clusterName string, clusterPassword string) error {
 	mount := MountDir + clusterName
@@ -230,8 +226,8 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 		ObjectMeta: v1.ObjectMeta{
 			Name: options.PVName,
 			Annotations: map[string]string{
-				provisionerIDAnn: string(p.identity),
-				vzShareAnn:       share,
+				parentProvisionerAnn: *provisionerId,
+				vzShareAnn:           share,
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -258,12 +254,12 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 // Delete removes the storage asset that was created by Provision represented
 // by the given PV.
 func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
-	ann, ok := volume.Annotations[provisionerIDAnn]
+	ann, ok := volume.Annotations[parentProvisionerAnn]
 	if !ok {
-		return errors.New("identity annotation not found on PV")
+		return errors.New("Parent provisioner name annotation not found on PV")
 	}
-	if ann != string(p.identity) {
-		return &controller.IgnoredError{"identity annotation on PV does not match ours"}
+	if ann != *provisionerId {
+		return &controller.IgnoredError{"parent provisioner name annotation on PV does not match ours"}
 	}
 	share, ok := volume.Annotations[vzShareAnn]
 	if !ok {
@@ -301,11 +297,15 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 var (
 	master     = flag.String("master", "", "Master URL")
 	kubeconfig = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
+	provisionerId = flag.String("name", "", "Unique provisioner name")
 )
 
 func main() {
 	flag.Parse()
 	flag.Set("logtostderr", "true")
+	if *provisionerId == "" {
+		glog.Fatalf("You should provide unique provisioner name!")
+	}
 
 	var config *rest.Config
 	var err error
