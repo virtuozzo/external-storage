@@ -1,0 +1,23 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: vz-provisioner-pod
+  namespace: kube-system
+spec:
+  hostNetwork: true
+  containers:
+  - name: virtuozzo-provisioner-pod
+    image: virtuozzo-storage:latest
+    imagePullPolicy: IfNotPresent
+    args: ["--name", "vz-provisioner"]
+    securityContext:
+      privileged: true
+    volumeMounts:
+      - name: k8s
+        mountPath: /etc/kubernetes
+        readOnly: true
+  restartPolicy: Always
+  volumes:
+    - name: k8s
+      hostPath:
+        path: /etc/kubernetes
