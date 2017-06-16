@@ -194,7 +194,7 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 	}
 	share := fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
 
-	glog.Infof("Add %s %s", share, bytes)
+	glog.Infof("Add %s %s", share, humanize.Bytes(uint64(bytes)))
 
 	storage_class_options := map[string]string{}
 	for k, v := range options.Parameters {
