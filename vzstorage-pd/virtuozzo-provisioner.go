@@ -54,7 +54,7 @@ type provisionOutput struct {
 }
 
 type vzFSProvisioner struct {
-	// Kubernetes Client. Use to retrieve Ceph admin secret
+	// Kubernetes Client. Use to retrieve secrets with Virtuozzo Storage credentials
 	client kubernetes.Interface
 }
 
@@ -334,8 +334,7 @@ func main() {
 	// the controller
 	vzFSProvisioner := newVzFSProvisioner(clientset)
 
-	// Start the provision controller which will dynamically provision cephFS
-	// PVs
+	// Start the provision controller which will dynamically provision Virtuozzo Storage PVs
 	pc := controller.NewProvisionController(clientset, resyncPeriod, provisionerName, vzFSProvisioner, serverVersion.GitVersion, exponentialBackOffOnError, failedRetryThreshold, 2*resyncPeriod, resyncPeriod, resyncPeriod/2, 2*resyncPeriod)
 
 	pc.Run(wait.NeverStop)
