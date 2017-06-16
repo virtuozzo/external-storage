@@ -66,7 +66,7 @@ func newVzFSProvisioner(client kubernetes.Interface) controller.Provisioner {
 
 var _ controller.Provisioner = &vzFSProvisioner{}
 
-const ProvisionerDir = "/var/run/virtuozzo-provisioner/"
+const ProvisionerDir = "/export/virtuozzo-provisioner/"
 const MountDir = ProvisionerDir + "mnt/"
 
 func prepareVstorage(options map[string]string, clusterName string, clusterPassword string) error {
