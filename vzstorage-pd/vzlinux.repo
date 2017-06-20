@@ -4,7 +4,7 @@ mirrorlist=http://repo.virtuozzo.com/vzlinux/mirrorlist/mirrors-7-os
 #baseurl=http://repo.virtuozzo.com/vzlinux/7.2/$basearch/os/
 enabled=1
 gpgcheck=1
-gpgkey=http://repo.virtuozzo.com/vzlinux/security/VIRTUOZZO_GPG_KEY
+gpgkey=http://repo.virtuozzo.com/vzlinux/security/VZLINUX_GPG_KEY
 
 #released updates
 [virtuozzolinux-updates]
@@ -13,4 +13,4 @@ mirrorlist=http://repo.virtuozzo.com/vzlinux/mirrorlist/mirrors-7-updates
 #baseurl=http://repo.virtuozzo.com/vzlinux/7.2/$basearch/updates/
 enabled=1
 gpgcheck=1
-gpgkey=http://repo.virtuozzo.com/vzlinux/security/VIRTUOZZO_GPG_KEY
+gpgkey=http://repo.virtuozzo.com/vzlinux/security/VZLINUX_GPG_KEY
