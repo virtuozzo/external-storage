@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-ploop3
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+    volumeMounts:
+    - name: test
+      mountPath: /data
+    ports:
+    - containerPort: 80
+  nodeSelector:
+    os: parallels # make sure you label your nodes to be ploop compatible 
+  volumes:
+  - name: test
+    flexVolume:
+      driver: "virtuozzo/ploop" # this must match your vendor dir
+      secretRef:
+        name: "ploop"
+      options:
+        volumeId: "golang-ploop-test"
+        size: "10G"
+        volumeId: "f4bc5a6b-c938-44e6-98f9-db28e184669d"
+        volumePath: "/mnt/vstorage/kube"
+        vzsReplicas: "3:1/2"
