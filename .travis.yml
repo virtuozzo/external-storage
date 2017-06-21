@@ -3,11 +3,10 @@ go:
   - 1.7.5
 services: docker
 
+go_import_path: github.com/kubernetes-incubator/external-storage
+
 env:
-  - TEST_SUITE=local-volume
   - TEST_SUITE=everything-else
-  - TEST_SUITE=nfs ETCD_VER=v3.0.14 KUBE_VERSION=1.5.4
-  - TEST_SUITE=nfs ETCD_VER=v3.0.17 KUBE_VERSION=1.6.0
 
 install: true
 
