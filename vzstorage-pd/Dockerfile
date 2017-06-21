@@ -1,6 +1,5 @@
 FROM centos:7
 ENTRYPOINT ["vzstorage-pd"]
-CMD -kubeconfig=/etc/kubernetes/config
 
 ADD virtuozzo.repo /etc/yum.repos.d/
 ADD vzlinux.repo /etc/yum.repos.d/
