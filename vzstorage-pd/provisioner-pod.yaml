@@ -9,7 +9,9 @@ spec:
   - name: virtuozzo-provisioner-pod
     image: virtuozzo-storage:latest
     imagePullPolicy: IfNotPresent
-    args: ["--name", "vz-provisioner"]
+    args:
+      - -kubeconfig=/etc/kubernetes/admin.conf
+      - -name=vz-provisioner
     securityContext:
       privileged: true
     volumeMounts:
