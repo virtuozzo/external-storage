@@ -6,6 +6,7 @@ services: docker
 go_import_path: github.com/kubernetes-incubator/external-storage
 
 env:
+  - TEST_SUITE=vzstorage-pd
   - TEST_SUITE=everything-else
 
 install: true
