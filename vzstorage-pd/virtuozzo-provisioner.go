@@ -40,7 +40,7 @@ import (
 )
 
 const (
-	provisionerName      = "kubernetes.io/virtuozzo-storage"
+	provisionerName      = "virtuozzo.com/virtuozzo-storage"
 	parentProvisionerAnn = "vzFSParentProvisioner"
 	vzShareAnn           = "vzShare"
 )
