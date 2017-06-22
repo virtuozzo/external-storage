@@ -1,6 +1,5 @@
 package: github.com/kubernetes-incubator/external-storage/virtuozzo-storage
 import:
 - package: github.com/virtuozzo/ploop-flexvol
-  version: kube-1.6
 - package: github.com/dustin/go-humanize
 - package: github.com/kolyshkin/goploop-cli
