@@ -27,6 +27,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-incubator/external-storage/lib/leaderelection"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -47,6 +48,10 @@ const (
 	failedRetryThreshold      = 5
 	parentProvisionerAnn      = "vzFSParentProvisioner"
 	vzShareAnn                = "vzShare"
+	leasePeriod               = leaderelection.DefaultLeaseDuration
+	retryPeriod               = leaderelection.DefaultRetryPeriod
+	renewDeadline             = leaderelection.DefaultRenewDeadline
+	termLimit                 = leaderelection.DefaultTermLimit
 )
 
 type provisionOutput struct {
