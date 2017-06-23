@@ -90,4 +90,6 @@ elif [ "$TEST_SUITE" = "everything-else" ]; then
 elif [ "$TEST_SUITE" = "local-volume" ]; then
 	make local-volume/provisioner
 	make test-local-volume/provisioner
+elif [ "$TEST_SUITE" = "vzstorage-pd" ]; then
+	make -C vzstorage-pd
 fi

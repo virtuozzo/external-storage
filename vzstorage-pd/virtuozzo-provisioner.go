@@ -23,7 +23,6 @@ import (
 	"os"
 	"os/exec"
 	"syscall"
-	"time"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
@@ -41,17 +40,10 @@ import (
 )
 
 const (
-	resyncPeriod              = 15 * time.Second
-	provisionerName           = "kubernetes.io/virtuozzo-storage"
-	exponentialBackOffOnError = false
-	failedRetryThreshold      = 5
-	parentProvisionerAnn      = "vzFSParentProvisioner"
-	vzShareAnn                = "vzShare"
+	provisionerName      = "virtuozzo.com/virtuozzo-storage"
+	parentProvisionerAnn = "vzFSParentProvisioner"
+	vzShareAnn           = "vzShare"
 )
-
-type provisionOutput struct {
-	Path string `json:"path"`
-}
 
 type vzFSProvisioner struct {
 	// Kubernetes Client. Use to retrieve secrets with Virtuozzo Storage credentials
@@ -66,11 +58,11 @@ func newVzFSProvisioner(client kubernetes.Interface) controller.Provisioner {
 
 var _ controller.Provisioner = &vzFSProvisioner{}
 
-const ProvisionerDir = "/export/virtuozzo-provisioner/"
-const MountDir = ProvisionerDir + "mnt/"
+const provisionerDir = "/export/virtuozzo-provisioner/"
+const mountDir = provisionerDir + "mnt/"
 
 func prepareVstorage(options map[string]string, clusterName string, clusterPassword string) error {
-	mount := MountDir + clusterName
+	mount := mountDir + clusterName
 	mounted, _ := vstorage.IsVstorage(mount)
 	if mounted {
 		return nil
@@ -98,15 +90,15 @@ func prepareVstorage(options map[string]string, clusterName string, clusterPassw
 
 func createPloop(mount string, options map[string]string) error {
 	var (
-		volumePath, volumeId, size string
+		volumePath, volumeID, size string
 	)
 
 	for k, v := range options {
 		switch k {
 		case "volumePath":
 			volumePath = v
-		case "volumeId":
-			volumeId = v
+		case "volumeID":
+			volumeID = v
 		case "size":
 			size = v
 		case "vzsReplicas":
@@ -123,8 +115,8 @@ func createPloop(mount string, options map[string]string) error {
 		return fmt.Errorf("volumePath isn't specified")
 	}
 
-	if volumeId == "" {
-		return fmt.Errorf("volumeId isn't specified")
+	if volumeID == "" {
+		return fmt.Errorf("volumeID isn't specified")
 	}
 
 	if size == "" {
@@ -135,12 +127,12 @@ func createPloop(mount string, options map[string]string) error {
 	bytes, _ := humanize.ParseBytes(size)
 
 	// ploop driver takes kilobytes, so convert it
-	volume_size := bytes / 1024
+	volumeSize := bytes / 1024
 
-	ploop_path := mount + "/" + options["volumePath"] + "/" + options["volumeId"]
+	ploopPath := mount + "/" + options["volumePath"] + "/" + options["volumeID"]
 
 	// make the base directory where the volume will go
-	err := os.MkdirAll(ploop_path, 0700)
+	err := os.MkdirAll(ploopPath, 0700)
 	if err != nil {
 		return err
 	}
@@ -160,19 +152,19 @@ func createPloop(mount string, options map[string]string) error {
 		}
 		if attr != "" {
 			cmd := "vstorage"
-			args := []string{"set-attr", "-R", ploop_path,
+			args := []string{"set-attr", "-R", ploopPath,
 				fmt.Sprintf("%s=%s", attr, v)}
 			err = exec.Command(cmd, args...).Run()
 		}
 
 		if err != nil {
-			os.RemoveAll(ploop_path)
+			os.RemoveAll(ploopPath)
 			return fmt.Errorf("Unable to set %s to %s: %v", attr, v, err)
 		}
 	}
 
 	// Create the ploop volume
-	cp := ploop.CreateParam{Size: volume_size, File: ploop_path + "/" + options["volumeId"]}
+	cp := ploop.CreateParam{Size: volumeSize, File: ploopPath + "/" + options["volumeID"]}
 	if err := ploop.Create(&cp); err != nil {
 		return err
 	}
@@ -192,15 +184,15 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 
 	glog.Infof("Add %s %s", share, humanize.Bytes(uint64(bytes)))
 
-	storage_class_options := map[string]string{}
+	storageClassOptions := map[string]string{}
 	for k, v := range options.Parameters {
-		storage_class_options[k] = v
+		storageClassOptions[k] = v
 	}
 
-	storage_class_options["volumeId"] = share
-	storage_class_options["size"] = fmt.Sprintf("%d", bytes)
-	secretName := storage_class_options["secretName"]
-	delete(storage_class_options, "secretName")
+	storageClassOptions["volumeID"] = share
+	storageClassOptions["size"] = fmt.Sprintf("%d", bytes)
+	secretName := storageClassOptions["secretName"]
+	delete(storageClassOptions, "secretName")
 
 	secret, err := p.client.Core().Secrets(options.PVC.Namespace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
@@ -209,12 +201,12 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 
 	name := string(secret.Data["clusterName"][:len(secret.Data["clusterName"])])
 	password := string(secret.Data["clusterPassword"][:len(secret.Data["clusterPassword"])])
-	if err := prepareVstorage(storage_class_options, name, password); err != nil {
+	if err := prepareVstorage(storageClassOptions, name, password); err != nil {
 		return nil, err
 	}
-	defer syscall.Unmount(MountDir+name, syscall.MNT_DETACH)
+	defer syscall.Unmount(mountDir+name, syscall.MNT_DETACH)
 
-	if err := createPloop(MountDir+name, storage_class_options); err != nil {
+	if err := createPloop(mountDir+name, storageClassOptions); err != nil {
 		return nil, err
 	}
 
@@ -222,7 +214,7 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
 			Annotations: map[string]string{
-				parentProvisionerAnn: *provisionerId,
+				parentProvisionerAnn: *provisionerID,
 				vzShareAnn:           share,
 			},
 		},
@@ -236,7 +228,7 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 				FlexVolume: &v1.FlexVolumeSource{
 					Driver:    "virtuozzo/ploop",
 					SecretRef: &v1.LocalObjectReference{Name: secretName},
-					Options:   storage_class_options,
+					Options:   storageClassOptions,
 				},
 			},
 		},
@@ -254,7 +246,7 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	if !ok {
 		return errors.New("Parent provisioner name annotation not found on PV")
 	}
-	if ann != *provisionerId {
+	if ann != *provisionerID {
 		return &controller.IgnoredError{"parent provisioner name annotation on PV does not match ours"}
 	}
 	share, ok := volume.Annotations[vzShareAnn]
@@ -272,13 +264,13 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 
 	name := string(secret.Data["clusterName"][:len(secret.Data["clusterName"])])
 	password := string(secret.Data["clusterPassword"][:len(secret.Data["clusterPassword"])])
-	mount := MountDir + name
+	mount := mountDir + name
 	if err := prepareVstorage(options, name, password); err != nil {
 		return err
 	}
 	defer syscall.Unmount(mount, syscall.MNT_DETACH)
 
-	path := mount + "/" + options["volumePath"] + "/" + options["volumeId"]
+	path := mount + "/" + options["volumePath"] + "/" + options["volumeID"]
 	glog.Infof("Delete: %s", path)
 	err = os.RemoveAll(path)
 	if err != nil {
@@ -293,13 +285,13 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 var (
 	master        = flag.String("master", "", "Master URL")
 	kubeconfig    = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
-	provisionerId = flag.String("name", "", "Unique provisioner name")
+	provisionerID = flag.String("name", "", "Unique provisioner name")
 )
 
 func main() {
 	flag.Parse()
 	flag.Set("logtostderr", "true")
-	if *provisionerId == "" {
+	if *provisionerID == "" {
 		glog.Fatalf("You should provide unique provisioner name!")
 	}
 

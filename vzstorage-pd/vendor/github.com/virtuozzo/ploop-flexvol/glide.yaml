@@ -1,0 +1,11 @@
+package: .
+import:
+- package: github.com/dustin/go-humanize
+  version: 259d2a102b871d17f30e3cd9881a642961a1e486
+- package: github.com/jaxxstorm/flexvolume
+  version: b65378104ef0f49af77d6f73d87da7e78d0f8252
+- package: github.com/kolyshkin/goploop-cli
+  version: 5365b446a713e31ac4f2026b05a6dac27bbdf21c
+- package: github.com/urfave/cli
+  version: ^1.19.1
+- package: github.com/golang/glog
