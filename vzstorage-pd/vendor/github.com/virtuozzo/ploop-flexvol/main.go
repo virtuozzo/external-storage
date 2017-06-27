@@ -23,6 +23,8 @@ func setup_journld() ([]string, *exec.Cmd, error) {
 		return nil, nil, err
 	}
 
+	syscall.CloseOnExec(fd)
+
 	flexvolume.SetRespFile(os.NewFile((uintptr)(fd), "RespFile"))
 
 	flag.CommandLine.Parse([]string{"-logtostderr"})
@@ -33,25 +35,26 @@ func setup_journld() ([]string, *exec.Cmd, error) {
 	}
 	pr, pw, err := os.Pipe()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("Unable to create a pipe: %v", err)
 	}
 	cmd.Stdin = pr
 	defer pr.Close()
 	defer pw.Close()
 
 	if err := syscall.Dup2(int(pw.Fd()), syscall.Stdout); err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("Unable to redirect stdout: %v", err)
 	}
 	if err := syscall.Dup2(syscall.Stdout, syscall.Stderr); err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("Unable to redirect stderr: %v", err)
 	}
 	if err := cmd.Start(); err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("Unable to start systemd-cat: %v", err)
 	}
 	return os.Args, cmd, nil
 }
 
 func setup_wrapper_logging() ([]string, *exec.Cmd, error) {
+	syscall.CloseOnExec(3)
 	flexvolume.SetRespFile(os.NewFile((uintptr)(3), "RespFile"))
 	flag.CommandLine.Parse(os.Args[2:])
 	return flag.CommandLine.Args(), nil, nil
