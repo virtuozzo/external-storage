@@ -132,7 +132,7 @@ func createPloop(mount string, options map[string]string) error {
 	ploopPath := mount + "/" + options["volumePath"] + "/" + options["volumeID"]
 
 	// make the base directory where the volume will go
-	err := os.MkdirAll(ploopPath, 0700)
+	err := os.MkdirAll(ploopPath, 0755)
 	if err != nil {
 		return err
 	}
