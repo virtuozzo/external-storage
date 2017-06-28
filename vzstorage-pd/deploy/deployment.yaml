@@ -1,0 +1,25 @@
+kind: Deployment
+apiVersion: extensions/v1beta1
+metadata:
+  name: vz-provisioner
+  namespace: kube-system
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: vz-provisioner
+    spec:
+      serviceAccountName: vz-provisioner
+      hostNetwork: true
+      containers:
+      - name: vz-provisioner
+        image: virtuozzo-storage:latest
+        imagePullPolicy: IfNotPresent
+        args:
+          - -name=vz-provisioner
+        securityContext:
+          privileged: true
+      restartPolicy: Always

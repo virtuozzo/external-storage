@@ -1,0 +1,16 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: vz-provisioner
+  namespace: kube-system
+spec:
+  serviceAccountName: vz-provisioner
+  hostNetwork: true
+  containers:
+  - name: vz-provisioner
+    image: virtuozzo-storage:latest
+    args:
+      - -name=vz-provisioner
+    securityContext:
+      privileged: true
+  restartPolicy: Always
