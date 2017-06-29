@@ -204,7 +204,6 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 	if err := prepareVstorage(storageClassOptions, name, password); err != nil {
 		return nil, err
 	}
-	defer syscall.Unmount(mountDir+name, syscall.MNT_DETACH)
 
 	if err := createPloop(mountDir+name, storageClassOptions); err != nil {
 		return nil, err
@@ -269,7 +268,6 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	if err := prepareVstorage(options, name, password); err != nil {
 		return err
 	}
-	defer syscall.Unmount(mount, syscall.MNT_DETACH)
 
 	path := mount + "/" + options["volumePath"] + "/" + options["volumeID"]
 	glog.Infof("Delete: %s", path)
