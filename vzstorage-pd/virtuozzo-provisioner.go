@@ -132,7 +132,7 @@ func createPloop(mount string, options map[string]string) error {
 	ploopPath := mount + "/" + options["volumePath"] + "/" + options["volumeID"]
 
 	// make the base directory where the volume will go
-	err := os.MkdirAll(ploopPath, 0700)
+	err := os.MkdirAll(ploopPath, 0755)
 	if err != nil {
 		return err
 	}
@@ -210,6 +210,7 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 		return nil, err
 	}
 
+	storageClassOptions["clusterName"] = name
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
