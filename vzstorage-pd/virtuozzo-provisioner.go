@@ -40,7 +40,6 @@ import (
 )
 
 const (
-	provisionerName      = "virtuozzo.com/virtuozzo-storage"
 	parentProvisionerAnn = "vzFSParentProvisioner"
 	vzShareAnn           = "vzShare"
 )
@@ -282,9 +281,10 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 }
 
 var (
-	master        = flag.String("master", "", "Master URL")
-	kubeconfig    = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
-	provisionerID = flag.String("name", "", "Unique provisioner name")
+	master          = flag.String("master", "", "Master URL")
+	kubeconfig      = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
+	provisionerID   = flag.String("id", "", "Unique provisioner id")
+	provisionerName = flag.String("name", "virtuozzo.com/virtuozzo-storage", "Unique provisioner name")
 )
 
 func main() {
@@ -323,7 +323,7 @@ func main() {
 
 	// Start the provision controller which will dynamically provision Virtuozzo Storage PVs
 	pc := controller.NewProvisionController(clientset,
-		provisionerName,
+		*provisionerName,
 		vzFSProvisioner,
 		serverVersion.GitVersion,
 	)

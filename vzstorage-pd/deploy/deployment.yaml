@@ -19,7 +19,8 @@ spec:
         image: virtuozzo-storage:latest
         imagePullPolicy: IfNotPresent
         args:
-          - -name=vz-provisioner
+          - -name=virtuozzo.com/virtuozzo-storage
+          - -id=vz-provisioner
         securityContext:
           privileged: true
       restartPolicy: Always
