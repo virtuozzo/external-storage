@@ -10,7 +10,8 @@ spec:
   - name: vz-provisioner
     image: virtuozzo-storage:latest
     args:
-      - -name=vz-provisioner
+      - -name=virtuozzo.com/virtuozzo-storage
+      - -id=vz-provisioner
     securityContext:
       privileged: true
   restartPolicy: Always

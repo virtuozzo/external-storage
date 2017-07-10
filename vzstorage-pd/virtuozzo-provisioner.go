@@ -40,7 +40,6 @@ import (
 )
 
 const (
-	provisionerName      = "virtuozzo.com/virtuozzo-storage"
 	parentProvisionerAnn = "vzFSParentProvisioner"
 	vzShareAnn           = "vzShare"
 )
@@ -204,7 +203,6 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 	if err := prepareVstorage(storageClassOptions, name, password); err != nil {
 		return nil, err
 	}
-	defer syscall.Unmount(mountDir+name, syscall.MNT_DETACH)
 
 	if err := createPloop(mountDir+name, storageClassOptions); err != nil {
 		return nil, err
@@ -269,7 +267,6 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	if err := prepareVstorage(options, name, password); err != nil {
 		return err
 	}
-	defer syscall.Unmount(mount, syscall.MNT_DETACH)
 
 	path := mount + "/" + options["volumePath"] + "/" + options["volumeID"]
 	glog.Infof("Delete: %s", path)
@@ -284,9 +281,10 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 }
 
 var (
-	master        = flag.String("master", "", "Master URL")
-	kubeconfig    = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
-	provisionerID = flag.String("name", "", "Unique provisioner name")
+	master          = flag.String("master", "", "Master URL")
+	kubeconfig      = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
+	provisionerID   = flag.String("id", "", "Unique provisioner id")
+	provisionerName = flag.String("name", "virtuozzo.com/virtuozzo-storage", "Unique provisioner name")
 )
 
 func main() {
@@ -325,7 +323,7 @@ func main() {
 
 	// Start the provision controller which will dynamically provision Virtuozzo Storage PVs
 	pc := controller.NewProvisionController(clientset,
-		provisionerName,
+		*provisionerName,
 		vzFSProvisioner,
 		serverVersion.GitVersion,
 	)
