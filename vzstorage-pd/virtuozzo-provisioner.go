@@ -173,6 +173,15 @@ func createPloop(mount string, options map[string]string) error {
 
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
+	modes := options.PVC.Spec.AccessModes
+	if len(modes) == 0 {
+		// if AccessModes field is absent, ReadWriteOnce is used by default
+		modes = append(modes, v1.ReadWriteOnce)
+	} else {
+		if len(modes) != 1 && modes[0] != v1.ReadWriteOnce {
+			return nil, fmt.Errorf("Virtuozzo flexvolume provisioner supports only ReadWriteOnce access mode")
+		}
+	}
 	capacity := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	bytes := capacity.Value()
 
@@ -219,7 +228,7 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   options.PVC.Spec.AccessModes,
+			AccessModes:                   modes,
 			Capacity: v1.ResourceList{
 				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 			},
