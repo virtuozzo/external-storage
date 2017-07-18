@@ -178,7 +178,7 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 		// if AccessModes field is absent, ReadWriteOnce is used by default
 		modes = append(modes, v1.ReadWriteOnce)
 	} else {
-		if len(modes) != 1 && modes[0] != v1.ReadWriteOnce {
+		if len(modes) != 1 || modes[0] != v1.ReadWriteOnce {
 			return nil, fmt.Errorf("Virtuozzo flexvolume provisioner supports only ReadWriteOnce access mode")
 		}
 	}
