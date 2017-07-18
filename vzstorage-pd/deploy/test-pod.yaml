@@ -4,7 +4,7 @@ metadata:
   name: test-pod
 spec:
   containers:
-  - name: test-pod-ro
+  - name: test-pod-rw
     image: gcr.io/google_containers/busybox:1.24
     command:
       - "/bin/sh"
@@ -14,7 +14,6 @@ spec:
     volumeMounts:
       - name: pvc
         mountPath: "/mnt"
-        readOnly: false
   restartPolicy: "Never"
   volumes:
     - name: pvc

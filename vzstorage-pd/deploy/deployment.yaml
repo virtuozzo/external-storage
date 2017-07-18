@@ -16,8 +16,7 @@ spec:
       hostNetwork: true
       containers:
       - name: vz-provisioner
-        image: virtuozzo-storage:latest
-        imagePullPolicy: IfNotPresent
+        image: virtuozzo/virtuozzo-provisioner:latest
         args:
           - -name=virtuozzo.com/virtuozzo-storage
           - -id=vz-provisioner
