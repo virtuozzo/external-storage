@@ -34,7 +34,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/dustin/go-humanize"
-	"github.com/kolyshkin/goploop-cli"
+	"github.com/virtuozzo/goploop-cli"
 	"github.com/virtuozzo/ploop-flexvol/vstorage"
 )
 
