@@ -27,7 +27,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
@@ -188,7 +187,7 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 	if options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
-	share := fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
+	share := fmt.Sprintf("kubernetes-dynamic-pvc-%s", options.PVC.UID)
 
 	glog.Infof("Add %s %s", share, humanize.Bytes(uint64(bytes)))
 
