@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"syscall"
 
 	"github.com/golang/glog"
@@ -127,10 +128,15 @@ func createPloop(mount string, options map[string]string) error {
 	// ploop driver takes kilobytes, so convert it
 	volumeSize := bytes / 1024
 
-	ploopPath := mount + "/" + options["volumePath"] + "/" + options["volumeID"]
+	// create ploop deltas path
+	if err := os.MkdirAll(path.Join(mount, options["deltaPath"]), 0755); err != nil {
+		return err
+	}
 
-	// make the base directory where the volume will go
-	err := os.MkdirAll(ploopPath, 0755)
+	ploopPath := path.Join(mount, options["volumePath"], options["volumeID"])
+	deltaPath := path.Join(mount, options["deltasPath"], options["volumeID"])
+	// Create the ploop volume
+	_, err := ploop.PloopVolumeCreate(ploopPath, volumeSize, deltaPath)
 	if err != nil {
 		return err
 	}
@@ -159,12 +165,6 @@ func createPloop(mount string, options map[string]string) error {
 			os.RemoveAll(ploopPath)
 			return fmt.Errorf("Unable to set %s to %s: %v", attr, v, err)
 		}
-	}
-
-	// Create the ploop volume
-	cp := ploop.CreateParam{Size: volumeSize, File: ploopPath + "/" + options["volumeID"]}
-	if err := ploop.Create(&cp); err != nil {
-		return err
 	}
 
 	return nil
