@@ -276,10 +276,13 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return err
 	}
 
-	path := mount + "/" + options["volumePath"] + "/" + options["volumeID"]
-	glog.Infof("Delete: %s", path)
-	err = os.RemoveAll(path)
+	ploopPath := path.Join(mount, options["volumePath"], options["volumeID"])
+	vol, err := ploop.PloopVolumeOpen(ploopPath)
 	if err != nil {
+		return err
+	}
+	glog.Infof("Delete: %s", ploopPath)
+	if err := vol.Delete(); err != nil {
 		return err
 	}
 
