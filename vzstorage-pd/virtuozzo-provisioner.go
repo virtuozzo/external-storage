@@ -142,7 +142,6 @@ func createPloop(mount string, options map[string]string) error {
 	}
 
 	for k, v := range options {
-		var err error
 		attr := ""
 		switch k {
 		case "vzsReplicas":
