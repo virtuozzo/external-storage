@@ -65,3 +65,38 @@ func ploopOut(args ...string) (string, error) {
 	}
 	return out, ret
 }
+
+func ploopVolumeRunCmd(stdout io.Writer, args ...string) error {
+	var stderr bytes.Buffer
+	cmd := exec.Command("ploop-volume", args...)
+	cmd.Stdout = stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err == nil {
+		return nil
+	}
+
+	// Command returned an error, get the stderr
+	errStr := stderr.String()
+	// Get the exit code (Unix-specific)
+	if exiterr, ok := err.(*exec.ExitError); ok {
+		if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+			errCode := status.ExitStatus()
+			return &Err{c: errCode, s: errStr}
+		}
+	}
+	// unknown exit code
+	return &Err{c: -1, s: errStr}
+}
+
+func ploopVolume(args ...string) error {
+	return ploopVolumeRunCmd(nil, args...)
+}
+
+func ploopVolumeOut(args ...string) (string, error) {
+	var stdout bytes.Buffer
+	ret := ploopVolumeRunCmd(&stdout, args...)
+	out := stdout.String()
+	return out, ret
+}

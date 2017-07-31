@@ -5,3 +5,4 @@ import:
   - vstorage
 - package: github.com/dustin/go-humanize
 - package: github.com/kolyshkin/goploop-cli
+- package: github.com/virtuozzo/goploop-cli

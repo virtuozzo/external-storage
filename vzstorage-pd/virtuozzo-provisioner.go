@@ -22,12 +22,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"syscall"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
@@ -35,7 +35,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/dustin/go-humanize"
-	"github.com/kolyshkin/goploop-cli"
+	"github.com/virtuozzo/goploop-cli"
 	"github.com/virtuozzo/ploop-flexvol/vstorage"
 )
 
@@ -128,16 +128,20 @@ func createPloop(mount string, options map[string]string) error {
 	// ploop driver takes kilobytes, so convert it
 	volumeSize := bytes / 1024
 
-	ploopPath := mount + "/" + options["volumePath"] + "/" + options["volumeID"]
+	// create ploop deltas path
+	if err := os.MkdirAll(path.Join(mount, options["deltaPath"]), 0755); err != nil {
+		return err
+	}
 
-	// make the base directory where the volume will go
-	err := os.MkdirAll(ploopPath, 0755)
+	ploopPath := path.Join(mount, options["volumePath"], options["volumeID"])
+	deltaPath := path.Join(mount, options["deltasPath"], options["volumeID"])
+	// Create the ploop volume
+	_, err := ploop.PloopVolumeCreate(ploopPath, volumeSize, deltaPath)
 	if err != nil {
 		return err
 	}
 
 	for k, v := range options {
-		var err error
 		attr := ""
 		switch k {
 		case "vzsReplicas":
@@ -162,12 +166,6 @@ func createPloop(mount string, options map[string]string) error {
 		}
 	}
 
-	// Create the ploop volume
-	cp := ploop.CreateParam{Size: volumeSize, File: ploopPath + "/" + options["volumeID"]}
-	if err := ploop.Create(&cp); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -188,7 +186,7 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 	if options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
-	share := fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
+	share := fmt.Sprintf("kubernetes-dynamic-pvc-%s", options.PVC.UID)
 
 	glog.Infof("Add %s %s", share, humanize.Bytes(uint64(bytes)))
 
@@ -277,10 +275,13 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return err
 	}
 
-	path := mount + "/" + options["volumePath"] + "/" + options["volumeID"]
-	glog.Infof("Delete: %s", path)
-	err = os.RemoveAll(path)
+	ploopPath := path.Join(mount, options["volumePath"], options["volumeID"])
+	vol, err := ploop.PloopVolumeOpen(ploopPath)
 	if err != nil {
+		return err
+	}
+	glog.Infof("Delete: %s", ploopPath)
+	if err := vol.Delete(); err != nil {
 		return err
 	}
 

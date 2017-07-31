@@ -5,4 +5,5 @@ metadata:
 provisioner: virtuozzo.com/virtuozzo-storage
 parameters:
   volumePath: "k8s-volumes"
+  deltasPath: "k8s-deltas"
   secretName: "virtuozzo-secret"
