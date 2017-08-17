@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -28,6 +29,9 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
@@ -169,6 +173,28 @@ func createPloop(mount string, options map[string]string) error {
 	return nil
 }
 
+func (p *vzFSProvisioner) patchSecret(oldSecret, newSecret *v1.Secret) error {
+	oldData, err := json.Marshal(oldSecret)
+	if err != nil {
+		glog.Errorf("failed to marshal secret %s: %v", newSecret.Name, err)
+		return err
+	}
+	newData, err := json.Marshal(newSecret)
+	if err != nil {
+		glog.Errorf("failed to marshal secret patch %s: %v", newSecret.Name, err)
+		return err
+	}
+
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Secret{})
+	if err != nil {
+		glog.Errorf("failed to create patch for secret %s: %v", newSecret.Name, err)
+		return err
+	}
+
+	_, err = p.client.Core().Secrets(newSecret.ObjectMeta.Namespace).Patch(newSecret.Name, types.StrategicMergePatchType, patchBytes)
+	return err
+}
+
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
 	modes := options.PVC.Spec.AccessModes
@@ -215,10 +241,12 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 		return nil, err
 	}
 
+	u := uuid.NewUUID()
 	storageClassOptions["clusterName"] = name
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
+			UID:  u,
 			Annotations: map[string]string{
 				parentProvisionerAnn: *provisionerID,
 				vzShareAnn:           share,
@@ -240,8 +268,19 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 		},
 	}
 
+	newSecret := secret
+	ref := metav1.OwnerReference{
+		Name:               options.PVName,
+		Kind:               "PersistentVolume",
+		UID:                u,
+		Controller:         nil,
+		BlockOwnerDeletion: nil,
+	}
+	newSecret.OwnerReferences = append(newSecret.OwnerReferences, ref)
+	if err = p.patchSecret(secret, newSecret); err != nil {
+		glog.Errorf("Failed to update owner reference in secret: %s", secretName)
+	}
 	glog.Infof("successfully created virtuozzo storage share: %s", share)
-
 	return pv, nil
 }
 
