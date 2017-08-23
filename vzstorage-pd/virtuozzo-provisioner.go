@@ -190,6 +190,7 @@ func (p *vzFSProvisioner) patchSecret(oldSecret, newSecret *v1.Secret) error {
 		glog.Errorf("failed to create patch for secret %s: %v", newSecret.Name, err)
 		return err
 	}
+	glog.Infof("Secret %s patch: %s", newSecret.Name, string(patchBytes))
 
 	_, err = p.client.Core().Secrets(newSecret.ObjectMeta.Namespace).Patch(newSecret.Name, types.StrategicMergePatchType, patchBytes)
 	return err
@@ -268,17 +269,21 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 		},
 	}
 
-	newSecret := secret
-	ref := metav1.OwnerReference{
-		Name:               options.PVName,
-		Kind:               "PersistentVolume",
-		UID:                u,
-		Controller:         nil,
-		BlockOwnerDeletion: nil,
+	newSecret := *secret
+	finalizer := fmt.Sprintf("virtuozzo.com/%s-pv", u)
+	idx := -1
+	for i, f := range newSecret.Finalizers {
+		if f == finalizer {
+			idx = i
+			break
+		}
 	}
-	newSecret.OwnerReferences = append(newSecret.OwnerReferences, ref)
-	if err = p.patchSecret(secret, newSecret); err != nil {
-		glog.Errorf("Failed to update owner reference in secret: %s", secretName)
+	if idx == -1 {
+		newSecret.Finalizers = append(newSecret.Finalizers, finalizer)
+		if err = p.patchSecret(secret, &newSecret); err != nil {
+			glog.Errorf("Failed to update finalizers in secret: %s", secretName)
+			return nil, err
+		}
 	}
 	glog.Infof("successfully created virtuozzo storage share: %s", share)
 	return pv, nil
@@ -320,8 +325,25 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return err
 	}
 	glog.Infof("Delete: %s", ploopPath)
-	if err := vol.Delete(); err != nil {
+	if err = vol.Delete(); err != nil {
 		return err
+	}
+
+	newSecret := *secret
+	finalizer := fmt.Sprintf("virtuozzo.com/%s-pv", volume.UID)
+	idx := -1
+	for i, f := range newSecret.Finalizers {
+		if f == finalizer {
+			idx = i
+			break
+		}
+	}
+	if idx != -1 {
+		newSecret.Finalizers = append(newSecret.Finalizers[:idx], newSecret.Finalizers[idx+1:]...)
+		if err = p.patchSecret(secret, &newSecret); err != nil {
+			glog.Errorf("Failed to update finalizers in secret: %s", secretName)
+			return err
+		}
 	}
 
 	glog.Infof("successfully delete virtuozzo storage share: %s", share)
