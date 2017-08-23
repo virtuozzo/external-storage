@@ -133,7 +133,7 @@ func createPloop(mount string, options map[string]string) error {
 	volumeSize := bytes / 1024
 
 	// create ploop deltas path
-	if err := os.MkdirAll(path.Join(mount, options["deltaPath"]), 0755); err != nil {
+	if err := os.MkdirAll(path.Join(mount, options["deltasPath"]), 0755); err != nil {
 		return err
 	}
 
