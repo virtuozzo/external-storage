@@ -252,12 +252,12 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 		return nil, err
 	}
 
-	u := uuid.NewUUID()
+	finalizer := fmt.Sprintf("virtuozzo.com/%s-pv", uuid.NewUUID())
 	storageClassOptions["clusterName"] = name
+	storageClassOptions["finalizer"] = finalizer
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
-			UID:  u,
 			Annotations: map[string]string{
 				parentProvisionerAnn: *provisionerID,
 				vzShareAnn:           share,
@@ -280,7 +280,6 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 	}
 
 	newSecret := *secret
-	finalizer := fmt.Sprintf("virtuozzo.com/%s-pv", u)
 	idx := -1
 	for i, f := range newSecret.Finalizers {
 		if f == finalizer {
@@ -336,8 +335,14 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return err
 	}
 
+	defer glog.Infof("successfully delete virtuozzo storage share: %s", share)
+
 	newSecret := *secret
-	finalizer := fmt.Sprintf("virtuozzo.com/%s-pv", volume.UID)
+	finalizer, ok := options["finalizer"]
+	if !ok {
+		glog.Warningf("Unable to find finalizer in flexvolume %s options", volume.Name)
+		return nil
+	}
 	idx := -1
 	for i, f := range newSecret.Finalizers {
 		if f == finalizer {
@@ -345,15 +350,15 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 			break
 		}
 	}
-	if idx != -1 {
-		newSecret.Finalizers = append(newSecret.Finalizers[:idx], newSecret.Finalizers[idx+1:]...)
-		if err = p.patchSecret(secret, &newSecret); err != nil {
-			glog.Errorf("Failed to update finalizers in secret: %s", secretName)
-			return err
-		}
+	if idx == -1 {
+		glog.Warningf("Cannot find finalizer %s in secret %s: %v", finalizer, secretName)
+		return nil
 	}
 
-	glog.Infof("successfully delete virtuozzo storage share: %s", share)
+	newSecret.Finalizers = append(newSecret.Finalizers[:idx], newSecret.Finalizers[idx+1:]...)
+	if err = p.patchSecret(secret, &newSecret); err != nil {
+		glog.Warningf("Failed to update finalizers in secret %s: %v", secretName, err)
+	}
 
 	return nil
 }
