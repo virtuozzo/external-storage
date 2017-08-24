@@ -135,7 +135,7 @@ func createPloop(mount string, options map[string]string) error {
 	// create store dir for ploops
 	volumePath = path.Join(mount, volumePath)
 	if err := os.MkdirAll(volumePath, 0755); err != nil {
-		return err
+		return fmt.Errorf("Error creating dir %s: %v", volumePath, err)
 	}
 
 	ploopPath := path.Join(volumePath, volumeID)
