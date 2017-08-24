@@ -132,15 +132,9 @@ func createPloop(mount string, options map[string]string) error {
 	// ploop driver takes kilobytes, so convert it
 	volumeSize := bytes / 1024
 
-	// create ploop deltas path
-	if err := os.MkdirAll(path.Join(mount, options["deltasPath"]), 0755); err != nil {
-		return err
-	}
-
 	ploopPath := path.Join(mount, options["volumePath"], options["volumeID"])
-	deltaPath := path.Join(mount, options["deltasPath"], options["volumeID"])
 	// Create the ploop volume
-	_, err := ploop.PloopVolumeCreate(ploopPath, volumeSize, deltaPath)
+	_, err := ploop.PloopVolumeCreate(ploopPath, volumeSize, "" /*store image in ploopPath dir*/)
 	if err != nil {
 		return err
 	}
