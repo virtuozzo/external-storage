@@ -196,6 +196,16 @@ func (p *vzFSProvisioner) patchSecret(oldSecret, newSecret *v1.Secret) error {
 	return err
 }
 
+func removePloop(mount string, options map[string]string) error {
+	ploopPath := path.Join(mount, options["volumePath"], options["volumeID"])
+	vol, err := ploop.PloopVolumeOpen(ploopPath)
+	if err != nil {
+		return err
+	}
+	glog.Infof("Delete: %s", ploopPath)
+	return vol.Delete()
+}
+
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
 	modes := options.PVC.Spec.AccessModes
@@ -282,6 +292,9 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 		newSecret.Finalizers = append(newSecret.Finalizers, finalizer)
 		if err = p.patchSecret(secret, &newSecret); err != nil {
 			glog.Errorf("Failed to update finalizers in secret: %s", secretName)
+			if e := removePloop(mountDir+name, storageClassOptions); e != nil {
+				err = fmt.Errorf("Add finalizer error: %v; cleanup ploop-volume error: %v", err, e)
+			}
 			return nil, err
 		}
 	}
@@ -319,13 +332,7 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return err
 	}
 
-	ploopPath := path.Join(mount, options["volumePath"], options["volumeID"])
-	vol, err := ploop.PloopVolumeOpen(ploopPath)
-	if err != nil {
-		return err
-	}
-	glog.Infof("Delete: %s", ploopPath)
-	if err = vol.Delete(); err != nil {
+	if err = removePloop(mount, options); err != nil {
 		return err
 	}
 
