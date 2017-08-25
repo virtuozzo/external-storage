@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -184,6 +185,18 @@ func createPloop(mount string, options map[string]string) error {
 	return nil
 }
 
+func copySecret(secret *v1.Secret) (*v1.Secret, error) {
+	clone, err := api.Scheme.DeepCopy(secret)
+	if err != nil {
+		return nil, fmt.Errorf("Error cloning secret: %v", err)
+	}
+	newSecret, ok := clone.(*v1.Secret)
+	if !ok {
+		return nil, fmt.Errorf("Unexpected secret cast error: %v", newSecret)
+	}
+	return newSecret, nil
+}
+
 func (p *vzFSProvisioner) patchSecret(oldSecret, newSecret *v1.Secret) error {
 	oldData, err := json.Marshal(oldSecret)
 	if err != nil {
@@ -290,7 +303,10 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 		},
 	}
 
-	newSecret := *secret
+	newSecret, err := copySecret(secret)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to copy secret %s: %v", secret.Name, err)
+	}
 	idx := -1
 	for i, f := range newSecret.Finalizers {
 		if f == finalizer {
@@ -300,7 +316,7 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 	}
 	if idx == -1 {
 		newSecret.Finalizers = append(newSecret.Finalizers, finalizer)
-		if err = p.patchSecret(secret, &newSecret); err != nil {
+		if err = p.patchSecret(secret, newSecret); err != nil {
 			glog.Errorf("Failed to update finalizers in secret: %s", secretName)
 			if e := removePloop(mountDir+name, storageClassOptions); e != nil {
 				err = fmt.Errorf("Add finalizer error: %v; cleanup ploop-volume error: %v", err, e)
@@ -348,7 +364,11 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 
 	defer glog.Infof("successfully delete virtuozzo storage share: %s", share)
 
-	newSecret := *secret
+	newSecret, err := copySecret(secret)
+	if err != nil {
+		glog.Warningf("Failed to copy secret %s: %v", secret.Name, err)
+		return nil
+	}
 	finalizer, ok := options["finalizer"]
 	if !ok {
 		glog.Warningf("Unable to find finalizer in flexvolume %s options", volume.Name)
@@ -367,7 +387,7 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	}
 
 	newSecret.Finalizers = append(newSecret.Finalizers[:idx], newSecret.Finalizers[idx+1:]...)
-	if err = p.patchSecret(secret, &newSecret); err != nil {
+	if err = p.patchSecret(secret, newSecret); err != nil {
 		glog.Warningf("Failed to update finalizers in secret %s: %v", secretName, err)
 	}
 
