@@ -141,7 +141,7 @@ func createPloop(mount string, options map[string]string) error {
 
 	ploopPath := path.Join(mount, volumePath, volumeID)
 	// add .image suffix to handle case when deltasPath == volumePath
-	imageFile := path.Join(mount, deltasPath, volumeID + ".image", "root.hds")
+	imageFile := path.Join(mount, deltasPath, volumeID+".image", "root.hds")
 
 	// create base dirs for ploop metadatas and ploop images
 	for _, d := range []string{ploopPath, imageFile} {
