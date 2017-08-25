@@ -1,0 +1,12 @@
+# These repositories are for internal use by developers only
+# Enable them on your own risk!!!
+
+[factory]
+name=Build Factory packages for Containers
+mirrorlist=http://download.openvz.org/virtuozzo/mirrorlists/7.0/factory-os.mirrorlist
+#baseurl=http://download.openvz.org/virtuozzo/factory/x86_64/os/
+priority=49
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Virtuozzo-7
+
