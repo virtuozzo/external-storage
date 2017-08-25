@@ -93,13 +93,15 @@ func prepareVstorage(options map[string]string, clusterName string, clusterPassw
 
 func createPloop(mount string, options map[string]string) error {
 	var (
-		volumePath, volumeID, size string
+		volumePath, deltasPath, volumeID, size string
 	)
 
 	for k, v := range options {
 		switch k {
 		case "volumePath":
 			volumePath = v
+		case "deltasPath":
+			deltasPath = v
 		case "volumeID":
 			volumeID = v
 		case "size":
@@ -118,6 +120,10 @@ func createPloop(mount string, options map[string]string) error {
 		return fmt.Errorf("volumePath isn't specified")
 	}
 
+	if deltasPath == "" {
+		deltasPath = volumePath
+	}
+
 	if volumeID == "" {
 		return fmt.Errorf("volumeID isn't specified")
 	}
@@ -133,12 +139,13 @@ func createPloop(mount string, options map[string]string) error {
 	volumeSize := bytes / 1024
 
 	// create ploop deltas path
-	if err := os.MkdirAll(path.Join(mount, options["deltasPath"]), 0755); err != nil {
+	if err := os.MkdirAll(path.Join(mount, deltasPath), 0755); err != nil {
 		return err
 	}
 
-	ploopPath := path.Join(mount, options["volumePath"], options["volumeID"])
-	deltaPath := path.Join(mount, options["deltasPath"], options["volumeID"])
+	ploopPath := path.Join(mount, volumePath, options["volumeID"])
+	// add .image suffix to handle case when deltasPath == volumePath
+	deltaPath := path.Join(mount, deltasPath, options["volumeID"] + ".image")
 	// Create the ploop volume
 	_, err := ploop.PloopVolumeCreate(ploopPath, volumeSize, deltaPath)
 	if err != nil {
