@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -93,13 +94,15 @@ func prepareVstorage(options map[string]string, clusterName string, clusterPassw
 
 func createPloop(mount string, options map[string]string) error {
 	var (
-		volumePath, volumeID, size string
+		volumePath, deltasPath, volumeID, size string
 	)
 
 	for k, v := range options {
 		switch k {
 		case "volumePath":
 			volumePath = v
+		case "deltasPath":
+			deltasPath = v
 		case "volumeID":
 			volumeID = v
 		case "size":
@@ -118,6 +121,10 @@ func createPloop(mount string, options map[string]string) error {
 		return fmt.Errorf("volumePath isn't specified")
 	}
 
+	if deltasPath == "" {
+		deltasPath = volumePath
+	}
+
 	if volumeID == "" {
 		return fmt.Errorf("volumeID isn't specified")
 	}
@@ -132,15 +139,20 @@ func createPloop(mount string, options map[string]string) error {
 	// ploop driver takes kilobytes, so convert it
 	volumeSize := bytes / 1024
 
-	// create ploop deltas path
-	if err := os.MkdirAll(path.Join(mount, options["deltasPath"]), 0755); err != nil {
-		return err
+	ploopPath := path.Join(mount, volumePath, volumeID)
+	// add .image suffix to handle case when deltasPath == volumePath
+	imageFile := path.Join(mount, deltasPath, volumeID+".image", "root.hds")
+
+	// create base dirs for ploop metadatas and ploop images
+	for _, d := range []string{ploopPath, imageFile} {
+		baseDir := path.Dir(d)
+		if err := os.MkdirAll(baseDir, 0755); err != nil {
+			return fmt.Errorf("Error creating dir %s: %v", baseDir, err)
+		}
 	}
 
-	ploopPath := path.Join(mount, options["volumePath"], options["volumeID"])
-	deltaPath := path.Join(mount, options["deltasPath"], options["volumeID"])
 	// Create the ploop volume
-	_, err := ploop.PloopVolumeCreate(ploopPath, volumeSize, deltaPath)
+	_, err := ploop.PloopVolumeCreate(ploopPath, volumeSize, imageFile)
 	if err != nil {
 		return err
 	}
@@ -171,6 +183,18 @@ func createPloop(mount string, options map[string]string) error {
 	}
 
 	return nil
+}
+
+func copySecret(secret *v1.Secret) (*v1.Secret, error) {
+	clone, err := api.Scheme.DeepCopy(secret)
+	if err != nil {
+		return nil, fmt.Errorf("Error cloning secret: %v", err)
+	}
+	newSecret, ok := clone.(*v1.Secret)
+	if !ok {
+		return nil, fmt.Errorf("Unexpected secret cast error: %v", newSecret)
+	}
+	return newSecret, nil
 }
 
 func (p *vzFSProvisioner) patchSecret(oldSecret, newSecret *v1.Secret) error {
@@ -279,7 +303,10 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 		},
 	}
 
-	newSecret := *secret
+	newSecret, err := copySecret(secret)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to copy secret %s: %v", secret.Name, err)
+	}
 	idx := -1
 	for i, f := range newSecret.Finalizers {
 		if f == finalizer {
@@ -289,7 +316,7 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 	}
 	if idx == -1 {
 		newSecret.Finalizers = append(newSecret.Finalizers, finalizer)
-		if err = p.patchSecret(secret, &newSecret); err != nil {
+		if err = p.patchSecret(secret, newSecret); err != nil {
 			glog.Errorf("Failed to update finalizers in secret: %s", secretName)
 			if e := removePloop(mountDir+name, storageClassOptions); e != nil {
 				err = fmt.Errorf("Add finalizer error: %v; cleanup ploop-volume error: %v", err, e)
@@ -337,7 +364,11 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 
 	defer glog.Infof("successfully delete virtuozzo storage share: %s", share)
 
-	newSecret := *secret
+	newSecret, err := copySecret(secret)
+	if err != nil {
+		glog.Warningf("Failed to copy secret %s: %v", secret.Name, err)
+		return nil
+	}
 	finalizer, ok := options["finalizer"]
 	if !ok {
 		glog.Warningf("Unable to find finalizer in flexvolume %s options", volume.Name)
@@ -356,7 +387,7 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	}
 
 	newSecret.Finalizers = append(newSecret.Finalizers[:idx], newSecret.Finalizers[idx+1:]...)
-	if err = p.patchSecret(secret, &newSecret); err != nil {
+	if err = p.patchSecret(secret, newSecret); err != nil {
 		glog.Warningf("Failed to update finalizers in secret %s: %v", secretName, err)
 	}
 
