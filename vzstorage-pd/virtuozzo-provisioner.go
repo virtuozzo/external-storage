@@ -221,13 +221,38 @@ func (p *vzFSProvisioner) patchSecret(oldSecret, newSecret *v1.Secret) error {
 }
 
 func removePloop(mount string, options map[string]string) error {
+	volumePath := options["volumePath"]
+	volumeID := options["volumeID"]
+	deltasPath, ok := options["deltasPath"]
+	if !ok {
+		deltasPath = volumePath
+	}
+	imageDir := path.Join(mount, deltasPath, volumeID+".image")
 	ploopPath := path.Join(mount, options["volumePath"], options["volumeID"])
-	vol, err := ploop.PloopVolumeOpen(ploopPath)
+	ploopPathTmp := path.Join(mount, options["volumePath"], options["volumeID"]+".deleted")
+	err := os.Rename(ploopPath, ploopPathTmp)
 	if err != nil {
 		return err
 	}
-	glog.Infof("Delete: %s", ploopPath)
-	return vol.Delete()
+
+	cmd := "vstorage"
+	args := []string{"revoke", "-R", imageDir}
+	err = exec.Command(cmd, args...).Run()
+	if err != nil {
+		glog.Errorf("Unable to revoke a lease for %s", imageDir)
+	}
+
+	vol, err := ploop.PloopVolumeOpen(ploopPathTmp)
+	if err != nil {
+		return err
+	}
+	glog.Infof("Delete: %s", ploopPathTmp)
+	err = vol.Delete()
+	if err != nil {
+		return err
+	}
+	os.RemoveAll(imageDir)
+	return nil
 }
 
 // Provision creates a storage asset and returns a PV object representing it.
