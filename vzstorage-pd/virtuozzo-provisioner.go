@@ -139,47 +139,66 @@ func createPloop(mount string, options map[string]string) error {
 	// ploop driver takes kilobytes, so convert it
 	volumeSize := bytes / 1024
 
-	ploopPath := path.Join(mount, volumePath, volumeID)
+	volumeDir := path.Join(mount, volumePath)
+	ploopPath := path.Join(volumeDir, volumeID)
+
+	deltaDir := path.Join(mount, deltasPath)
 	// add .image suffix to handle case when deltasPath == volumePath
-	imageFile := path.Join(mount, deltasPath, volumeID+".image", "root.hds")
+	imageDir := path.Join(deltaDir, volumeID+".image")
+	imageFile := path.Join(imageDir, "root.hds")
+
+	if err := os.MkdirAll(volumeDir, 0755); err != nil {
+		return fmt.Errorf("Error creating dir %s: %v", volumeDir, err)
+	}
+
+	if err := os.MkdirAll(deltaDir, 0755); err != nil {
+		return fmt.Errorf("Error creating dir %s: %v", deltaDir, err)
+	}
 
 	// create base dirs for ploop metadatas and ploop images
-	for _, d := range []string{ploopPath, imageFile} {
-		baseDir := path.Dir(d)
-		if err := os.MkdirAll(baseDir, 0755); err != nil {
-			return fmt.Errorf("Error creating dir %s: %v", baseDir, err)
+	if err := os.Mkdir(ploopPath, 0755); err != nil {
+		return fmt.Errorf("Error creating dir %s: %v", ploopPath, err)
+	}
+
+	if err := os.Mkdir(imageDir, 0755); err != nil {
+		os.Remove(ploopPath)
+		return fmt.Errorf("Error creating dir %s: %v", imageDir, err)
+	}
+
+	for _, d := range []string{ploopPath, imageDir} {
+		for k, v := range options {
+			attr := ""
+			switch k {
+			case "vzsReplicas":
+				attr = "replicas"
+			case "vzsTier":
+				attr = "tier"
+			case "vzsEncoding":
+				attr = "encoding"
+			case "vzsFailureDomain":
+				attr = "failure-domain"
+			}
+			if attr == "" {
+				continue
+			}
+
+			cmd := "vstorage"
+			args := []string{"set-attr", "-R", d,
+				fmt.Sprintf("%s=%s", attr, v)}
+			if err := exec.Command(cmd, args...).Run(); err != nil {
+				os.Remove(ploopPath)
+				os.Remove(imageDir)
+				return fmt.Errorf("Unable to set %s to %s for %s: %v", attr, v, d, err)
+			}
 		}
 	}
 
 	// Create the ploop volume
 	_, err := ploop.PloopVolumeCreate(ploopPath, volumeSize, imageFile)
 	if err != nil {
+		os.RemoveAll(ploopPath)
+		os.RemoveAll(imageDir)
 		return err
-	}
-
-	for k, v := range options {
-		attr := ""
-		switch k {
-		case "vzsReplicas":
-			attr = "replicas"
-		case "vzsTier":
-			attr = "tier"
-		case "vzsEncoding":
-			attr = "encoding"
-		case "vzsFailureDomain":
-			attr = "failure-domain"
-		}
-		if attr != "" {
-			cmd := "vstorage"
-			args := []string{"set-attr", "-R", ploopPath,
-				fmt.Sprintf("%s=%s", attr, v)}
-			err = exec.Command(cmd, args...).Run()
-		}
-
-		if err != nil {
-			os.RemoveAll(ploopPath)
-			return fmt.Errorf("Unable to set %s to %s: %v", attr, v, err)
-		}
 	}
 
 	return nil

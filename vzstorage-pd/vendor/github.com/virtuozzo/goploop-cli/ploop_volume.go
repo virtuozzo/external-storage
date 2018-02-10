@@ -41,10 +41,6 @@ func PloopVolumeSnapshotOpen(src string) (*PloopVolumeSnapshot, error) {
 }
 
 func PloopVolumeCreate(src string, size uint64, image string) (*PloopVolume, error) {
-	if _, err := os.Stat(src); !os.IsNotExist(err) {
-		return nil, &Err{c: -1, s: fmt.Sprintf("Destination ploop directory already exists %s!", src)}
-	}
-
 	args := []string{"create", "-s", strconv.FormatUint(size, 10) + "K"}
 	if image != "" {
 		args = append(args, "--image", image)
