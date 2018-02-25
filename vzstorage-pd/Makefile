@@ -5,7 +5,7 @@ GITID	?= $(shell git describe --always HEAD || true)
 TARNAME	:= $(NAME)-$(GITID)
 
 all:
-	go build .
+	go build -i .
 .PHONY: all
 
 tar: $(TARNAME).tar.bz2
