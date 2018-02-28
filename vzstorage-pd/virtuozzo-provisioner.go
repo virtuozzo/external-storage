@@ -303,9 +303,19 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 	storageClassOptions["volumeID"] = share
 	storageClassOptions["size"] = fmt.Sprintf("%d", bytes)
 	secretName := storageClassOptions["secretName"]
-	delete(storageClassOptions, "secretName")
+	secretFromSystem := storageClassOptions["secretFromSystem"]
 
-	secret, err := p.client.Core().Secrets(options.PVC.Namespace).Get(secretName, metav1.GetOptions{})
+	secretNamespace := options.PVC.Namespace
+	secretRef := &v1.LocalObjectReference{Name: secretName}
+
+	if secretFromSystem == "true" {
+		secretNamespace = "kube-system"
+		secretRef = nil
+	}else{
+		delete(storageClassOptions, "secretName")
+	}
+
+	secret, err := p.client.Core().Secrets(secretNamespace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +350,7 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				FlexVolume: &v1.FlexVolumeSource{
 					Driver:    "virtuozzo/ploop",
-					SecretRef: &v1.LocalObjectReference{Name: secretName},
+					SecretRef: secretRef,
 					Options:   storageClassOptions,
 				},
 			},
@@ -387,10 +397,20 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return errors.New("vz share annotation not found on PV")
 	}
 
-	secretName := volume.Spec.PersistentVolumeSource.FlexVolume.SecretRef.Name
+	var secretName string
 	options := volume.Spec.PersistentVolumeSource.FlexVolume.Options
 
-	secret, err := p.client.Core().Secrets(volume.Spec.ClaimRef.Namespace).Get(secretName, metav1.GetOptions{})
+	secretFromSystem := options["secretFromSystem"]
+	secretNamespace := volume.Spec.ClaimRef.Namespace
+
+	if secretFromSystem == "true" {
+		secretNamespace = "kube-system"
+		secretName = options["secretName"]
+	}else{
+		secretName = volume.Spec.PersistentVolumeSource.FlexVolume.SecretRef.Name
+	}
+
+	secret, err := p.client.Core().Secrets(secretNamespace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
