@@ -303,12 +303,12 @@ func (p *vzFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 	storageClassOptions["volumeID"] = share
 	storageClassOptions["size"] = fmt.Sprintf("%d", bytes)
 	secretName := storageClassOptions["secretName"]
-	secretFromSystem := storageClassOptions["secretFromSystem"]
+	optionsFromSystem := storageClassOptions["optionsFromSystem"]
 
 	secretNamespace := options.PVC.Namespace
 	secretRef := &v1.LocalObjectReference{Name: secretName}
 
-	if secretFromSystem == "true" {
+	if optionsFromSystem == "true" {
 		secretNamespace = "kube-system"
 		secretRef = nil
 	} else {
@@ -400,10 +400,10 @@ func (p *vzFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	var secretName string
 	options := volume.Spec.PersistentVolumeSource.FlexVolume.Options
 
-	secretFromSystem := options["secretFromSystem"]
+	optionsFromSystem := options["optionsFromSystem"]
 	secretNamespace := volume.Spec.ClaimRef.Namespace
 
-	if secretFromSystem == "true" {
+	if optionsFromSystem == "true" {
 		secretNamespace = "kube-system"
 		secretName = options["secretName"]
 	} else {
