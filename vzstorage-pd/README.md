@@ -43,6 +43,44 @@ kubectl create -f claim.yaml
 kubectl create -f test-pod.yaml
 ```
 
+# Storage Class options
+
+By default, the storage class accepts the following parameters:
+
+```
+parameters:
+  volumePath: "k8s-volumes"
+  deltasPath: "k8s-deltas"
+  secretName: "virtuozzo-secret"
+```
+
+This will search for a Secret object called **"virtuozzo-secret"** in each namespace with a PVC using this storage class.
+This behaviour can be turned off using **secretFromSystem**:
+
+```
+parameters:
+  volumePath: "k8s-volumes"
+  deltasPath: "k8s-deltas"
+  secretName: "virtuozzo-secret"
+  secretFromSystem: "true"
+```
+
+If this option is set to _"true"_, the storage provisioner will search for this Secret object in the kube-system namespace.
+When this option is enabled, credentials should be passed to ploop-flexvol using environment variables
+
+```bash
+# cat /etc/systemd/system/kubelet.service.d/15-ploop.conf
+[Service]
+EnvironmentFile=/etc/sysconfig/ploop-flexvol
+# cat /etc/sysconfig/ploop-flexvol
+clusterName="base64encodedClusterName"
+clusterPassword="base64encodedPassword"
+workingDir="/vstorage"
+```
+
+
+
+
 # Ploop options
 
 A storage class parameters pass as ploop options to the ploop-flexvol driver.
